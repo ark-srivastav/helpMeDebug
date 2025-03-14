@@ -1,2 +1,3 @@
 .git.key
 node_modules
+/popup/build
