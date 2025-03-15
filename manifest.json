@@ -6,14 +6,19 @@
   "permissions": [
     "storage",
     "scripting",
-    "activeTab"
+    "activeTab",
+    "tabs"
+  ],
+  "host_permissions": [
+    "*://*/*"
   ],
   "action": {
     "default_popup": "popup/popup.html"
   },
   "content_scripts": [{
     "matches": ["*://*/*"],
-    "js": ["scripts/contentScript.js"]
+    "js": ["scripts/contentScript.js"],
+    "run_at": "document_start"
   }],
   "background": {
     "service_worker": "scripts/background.js"

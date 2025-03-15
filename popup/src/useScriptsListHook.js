@@ -1,79 +1,59 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { DEFAULT_SCRIPT_INPUT, sampleScripts, SCRIPT_STORAGE_KEY, defaultScriptsListHook } from "./utils";
+import React from "react";
+import { DEFAULT_SCRIPT_INPUT, sampleScripts } from "./utils";
 
-/**
- * 
- * @param {Object} hookParam 
- * @param {Function} hookParam.setScriptInput
- * @param {Object} hookParam.setScriptInput
- * @param {Function} hookParam.setScriptsListHook
- * @returns 
- */
 const useScriptsListHook = ({
-  setScriptInput = () => {},
-
+  setScriptInput,
   scriptsListHook,
-  setScriptsListHook = () => {},
-
-  handleStorageDispatch = () => {}
+  setScriptsListHook,
+  handleStorageDispatch
 }) => {
+  // Initialize on component mount
+  React.useEffect(() => {
+    handleStorageDispatch('initiate');
+  }, []);
 
-
-  useEffect(() => {
-    handleStorageDispatch()
-  }, [])
-
-  const loadSavedScripts = () => {
-    console.log({ chrome })
-    try {
-      chrome.storage.local.get([SCRIPT_STORAGE_KEY], (result) => {
-        console.log({ result })
-        if (result.savedScripts) {
-          // setSavedScripts(result.savedScripts);
-          // If we have scripts, select the first one
-          console.log({result})
-          const scriptNames = Object.keys(result.savedScripts);
-          if (scriptNames.length > 0) {
-            // setCurrentScriptName(scriptNames[0]);
-            // setScriptSelectionHook(() => ({ ...scriptSelectionHook, selectedScript: scriptSelectionHook.options[0].value }))
-            // setScriptInput(result.savedScripts[scriptNames[0]].content);
-          }
-        }
-      });
-    } catch (err) {
-      console.log({ err })
-      setScriptsListHook(() => (defaultScriptsListHook))
+  const handleScriptSelect = (scriptValue) => {
+    setScriptsListHook({ ...scriptsListHook, selected: scriptValue });
+    
+    // Special case for "new script" option
+    if (scriptValue === 'new') {
+      setScriptInput('// Enter your new script here...');
+    } else {
+      handleStorageDispatch('load', scriptValue);
     }
   };
 
-
-  const handleScriptSelect = (scriptVal) => {
-    console.log({ scriptVal })
-    setScriptInput(DEFAULT_SCRIPT_INPUT)
-    setScriptsListHook(() => ({ ...scriptsListHook, selected: scriptVal }))
-  }
-
-  const getOptions = () => {
-    return scriptsListHook.options.map(scriptOption => <option key={`option-key-${scriptOption.value}`} value={scriptOption.value}>{scriptOption.label}</option>)
-  }
-
   const renderScriptsOptionsList = () => {
-    return <div className="mb-4">
-      <select
-        value={scriptsListHook.selected}
-        onChange={(e) => handleScriptSelect(e.target.value)}
-        className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-      >
-        {getOptions()}
-      </select>
-    </div>
-  }
+    return (
+      <div className="mb-4">
+        <div className="flex justify-between items-center mb-2">
+          <label className="text-sm text-gray-400">Select Script</label>
+          <button 
+            onClick={() => handleScriptSelect('new')}
+            className="text-xs bg-purple-600 hover:bg-purple-700 px-2 py-1 rounded"
+          >
+            New Script
+          </button>
+        </div>
+        <select
+          value={scriptsListHook.selected}
+          onChange={(e) => handleScriptSelect(e.target.value)}
+          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+        >
+          <option value="new">-- New Script --</option>
+          {scriptsListHook.options.map(option => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
+      </div>
+    );
+  };
 
   return {
     renderScriptsOptionsList
-  }
-}
+  };
+};
 
-export {
-  useScriptsListHook
-}
+export { useScriptsListHook };
