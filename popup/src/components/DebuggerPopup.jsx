@@ -15,7 +15,7 @@ export default function DebuggerPopup() {
   const [isMaximized, setIsMaximized] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready to inject");
   const [targetUrl, setTargetUrl] = useState("");
-  const [overrideEnabled, setOverrideEnabled] = useState(false);
+  const [overrideEnabled, setOverrideEnabled] = useState(true);
   const [currentTab, setCurrentTab] = useState(null);
 
   // Get current tab info when popup opens
