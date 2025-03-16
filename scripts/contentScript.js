@@ -1,22 +1,5 @@
-// Global state to track script overrides
-let scriptOverrideEnabled = false;
-let scriptOverrideTarget = '';
-let scriptOverrideContent = '';
-
-// Function to send a message to the background script to set up interception
-function setupScriptInterception() {
-  // Send the current configuration to the background script
-  chrome.runtime.sendMessage({
-    action: 'setupInterception',
-    config: {
-      enabled: scriptOverrideEnabled,
-      targetUrl: scriptOverrideTarget,
-      scriptContent: scriptOverrideContent
-    }
-  }, (response) => {
-    console.log('Interception setup result:', response?.success ? 'success' : 'failed');
-  });
-}
+// Content script for Shopify Script Debugger
+console.log('Shopify Script Debugger content script initialized');
 
 // Function to get all script sources on the page
 function getPageScripts() {
@@ -30,7 +13,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   try {
     // Handle one-time script injection
     if (request.action === 'injectScript') {
-      // Ask the background script to inject the code
+      // Send to background script which has access to chrome.scripting API
       chrome.runtime.sendMessage({
         action: 'executeScript',
         code: request.scriptContent
@@ -42,24 +25,27 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     
     // Handle script override toggle
     else if (request.action === 'toggleScriptOverride') {
-      scriptOverrideEnabled = request.enabled;
-      scriptOverrideTarget = request.targetUrl;
-      scriptOverrideContent = request.scriptContent;
-      
-      // Setup the interception if enabled
-      if (scriptOverrideEnabled) {
-        setupScriptInterception();
-      }
-      
-      sendResponse({ success: true });
+      // Forward to background script which handles network interception
+      chrome.runtime.sendMessage({
+        action: 'toggleScriptOverride',
+        enabled: request.enabled,
+        targetUrl: request.targetUrl,
+        scriptContent: request.scriptContent
+      }, (response) => {
+        sendResponse(response);
+      });
+      return true;
     }
     
-    // Get current override status
+    // Get current override status from background script
     else if (request.action === 'getOverrideStatus') {
-      sendResponse({
-        enabled: scriptOverrideEnabled,
-        targetUrl: scriptOverrideTarget
+      // Ask background script for current status
+      chrome.runtime.sendMessage({
+        action: 'getOverrideStatus'
+      }, (response) => {
+        sendResponse(response);
       });
+      return true;
     }
     
     // Get scripts on the page
@@ -77,6 +63,3 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   // Return true to indicate we'll send a response asynchronously
   return true;
 });
-
-// Log initialization
-console.log('Shopify Script Debugger content script initialized');

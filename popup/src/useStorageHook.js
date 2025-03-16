@@ -4,7 +4,7 @@ import { defaultScriptsListHook, SCRIPT_STORAGE_KEY } from "./utils";
 const useStorageHook = ({
   scriptInput,
   setScriptInput,
-  scriptsListHook,  // Fixed parameter name
+  scriptsListHook,
   setScriptsListHook = () => {},
 }) => {
 
@@ -40,13 +40,14 @@ const useStorageHook = ({
     }
   };
 
-  const saveScript = () => {
+  const saveScript = (customScriptName) => {
     // Create a unique key if creating a new script
     const scriptKey = scriptsListHook.selected === 'new' 
       ? `script_${Date.now()}` 
       : scriptsListHook.selected;
     
-    const scriptName = `Script ${new Date().toLocaleString()}`;
+    // Use custom name if provided, otherwise use a timestamp-based name
+    const scriptName = customScriptName || `Script ${new Date().toLocaleString()}`;
     
     chrome.storage.local.get([SCRIPT_STORAGE_KEY], (result) => {
       const savedScripts = result[SCRIPT_STORAGE_KEY] || {};
@@ -75,9 +76,19 @@ const useStorageHook = ({
             options: [...scriptsListHook.options, newOption],
             selected: scriptKey
           });
+        } else {
+          // If updating an existing script, update its name in the options list
+          const updatedOptions = scriptsListHook.options.map(option => 
+            option.value === scriptKey ? { ...option, label: scriptName } : option
+          );
+          
+          setScriptsListHook({
+            options: updatedOptions,
+            selected: scriptKey
+          });
         }
         
-        console.log("Script saved successfully");
+        console.log(`Script "${scriptName}" saved successfully`);
       });
     });
   };
@@ -125,13 +136,13 @@ const useStorageHook = ({
     });
   };
 
-  const handleStorageDispatch = (action = 'initiate', scriptKey) => {
+  const handleStorageDispatch = (action = 'initiate', scriptKey, customScriptName) => {
     switch (action) {
       case 'initiate':
         initializeScriptsList();
         break;
       case 'save':
-        saveScript();
+        saveScript(customScriptName);
         break;
       case 'load':
         loadScript(scriptKey);

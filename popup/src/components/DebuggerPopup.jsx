@@ -15,8 +15,9 @@ export default function DebuggerPopup() {
   const [isMaximized, setIsMaximized] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready to inject");
   const [targetUrl, setTargetUrl] = useState("");
-  const [overrideEnabled, setOverrideEnabled] = useState(true);
+  const [overrideEnabled, setOverrideEnabled] = useState(false);
   const [currentTab, setCurrentTab] = useState(null);
+  const [scriptName, setScriptName] = useState(""); // New state for script name
 
   // Get current tab info when popup opens
   useEffect(() => {
@@ -59,8 +60,22 @@ export default function DebuggerPopup() {
   });
 
   const handleSaveScript = () => {
-    handleStorageDispatch('save');
-    setStatusMessage("Script saved successfully");
+    // Prompt for script name if it's a new script or the name hasn't been set
+    if (scriptsListHook.selected === 'new' || !scriptName) {
+      const defaultName = `Script ${new Date().toLocaleString()}`;
+      const newName = prompt("Enter a name for this script:", defaultName);
+      
+      if (newName) {
+        setScriptName(newName);
+        // Save script with the provided name
+        handleStorageDispatch('save', null, newName);
+        setStatusMessage(`Script "${newName}" saved successfully`);
+      }
+    } else {
+      // Save with existing name
+      handleStorageDispatch('save', null, scriptName);
+      setStatusMessage(`Script "${scriptName}" saved successfully`);
+    }
   };
 
   const handleDeleteScript = () => {
@@ -69,8 +84,12 @@ export default function DebuggerPopup() {
       return;
     }
     
-    handleStorageDispatch('delete', scriptsListHook.selected);
-    setStatusMessage("Script deleted successfully");
+    const confirmDelete = window.confirm(`Are you sure you want to delete "${scriptName || scriptsListHook.selected}"?`);
+    if (confirmDelete) {
+      handleStorageDispatch('delete', scriptsListHook.selected);
+      setStatusMessage(`Script deleted successfully`);
+      setScriptName(""); // Reset script name
+    }
   };
 
   const injectScript = () => {
@@ -150,6 +169,22 @@ export default function DebuggerPopup() {
     });
   };
 
+  // Update script name when selection changes
+  useEffect(() => {
+    if (scriptsListHook.selected !== 'new') {
+      // Find the selected script option to get its label
+      const selectedOption = scriptsListHook.options.find(
+        option => option.value === scriptsListHook.selected
+      );
+      
+      if (selectedOption) {
+        setScriptName(selectedOption.label);
+      }
+    } else {
+      setScriptName("");
+    }
+  }, [scriptsListHook.selected, scriptsListHook.options]);
+
   return (
     <div className="w-[600px] min-h-[500px] bg-gray-900 text-gray-100 p-4 font-mono">
       {/* Header */}
@@ -167,6 +202,18 @@ export default function DebuggerPopup() {
       </div>
       
       {renderScriptsOptionsList()}
+      
+      {/* Script Name Field (New) */}
+      <div className="mb-4">
+        <label className="text-sm text-gray-400 block mb-1">Script Name</label>
+        <input
+          type="text"
+          placeholder="Enter a name for this script"
+          value={scriptName}
+          onChange={(e) => setScriptName(e.target.value)}
+          className="w-full bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
+        />
+      </div>
       
       {/* Script URL Target Field */}
       <div className="mb-4">
