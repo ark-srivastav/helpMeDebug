@@ -1,11 +1,25 @@
 // Store override configurations per tab
 const tabOverrideConfigs = new Map();
 
-// Log initialization
-console.log('Shopify Script Debugger background script initialized');
+// Log initialization immediately to verify script loading
+console.log('[Shopify Script Debugger] Background script initializing');
+
+// Register the service worker
+self.addEventListener('install', (event) => {
+  console.log('[Shopify Script Debugger] Service worker installed');
+  self.skipWaiting(); // Ensure the service worker activates immediately
+});
+
+self.addEventListener('activate', (event) => {
+  console.log('[Shopify Script Debugger] Service worker activated');
+  // Claim any existing clients
+  event.waitUntil(clients.claim());
+});
 
 // Function to inject the interception code
 function injectInterceptionCode(tabId, config) {
+  console.log('[Shopify Script Debugger] Injecting interception code for tab', tabId);
+  
   // First, we'll inject a function to handle the interception
   chrome.scripting.executeScript({
     target: { tabId: tabId },
@@ -13,9 +27,9 @@ function injectInterceptionCode(tabId, config) {
     args: [config.targetUrl, config.scriptContent, config.enabled],
     world: 'MAIN'  // This is important - it executes in the page's context
   }).then(() => {
-    console.log('Interception code injected successfully for tab', tabId);
+    console.log('[Shopify Script Debugger] Interception code injected successfully for tab', tabId);
   }).catch(error => {
-    console.error('Failed to inject interception code:', error);
+    console.error('[Shopify Script Debugger] Failed to inject interception code:', error);
   });
 
   // This function will be serialized and injected into the page
@@ -180,6 +194,8 @@ function injectInterceptionCode(tabId, config) {
 
 // Function to execute a script in a tab
 function executeScript(tabId, code) {
+  console.log('[Shopify Script Debugger] Executing script in tab', tabId);
+  
   return chrome.scripting.executeScript({
     target: { tabId: tabId },
     func: (scriptCode) => {
@@ -197,19 +213,24 @@ function executeScript(tabId, code) {
 
 // Listen for messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  console.log('[Shopify Script Debugger] Background received message:', request.action);
+  
   // Handle script execution
   if (request.action === 'executeScript') {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || tabs.length === 0) {
+        console.error('[Shopify Script Debugger] No active tab found');
         sendResponse({ success: false, error: 'No active tab found' });
         return;
       }
       
       executeScript(tabs[0].id, request.code)
         .then(results => {
+          console.log('[Shopify Script Debugger] Script execution results:', results);
           sendResponse({ success: true, results });
         })
         .catch(error => {
+          console.error('[Shopify Script Debugger] Script execution error:', error);
           sendResponse({ success: false, error: error.message });
         });
     });
@@ -221,6 +242,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   else if (request.action === 'setupInterception') {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || tabs.length === 0) {
+        console.error('[Shopify Script Debugger] No active tab found');
         sendResponse({ success: false, error: 'No active tab found' });
         return;
       }
@@ -241,38 +263,50 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   
   // Handle update interception config
   else if (request.action === 'updateInterceptionConfig') {
-    const tabId = sender.tab.id;
+    const tabId = sender?.tab?.id;
+    
+    if (!tabId) {
+      console.error('[Shopify Script Debugger] No tab ID provided in updateInterceptionConfig');
+      sendResponse({ success: false, error: 'No tab ID provided' });
+      return true;
+    }
     
     // Update stored config
-    if (tabOverrideConfigs.has(tabId)) {
-      const config = tabOverrideConfigs.get(tabId);
-      config.enabled = request.enabled;
-      config.targetUrl = request.targetUrl;
-      config.scriptContent = request.scriptContent;
-      
-      // Execute script to update variables in page context
-      chrome.scripting.executeScript({
-        target: { tabId: tabId },
-        func: (enabled, target, content) => {
-          window.__scriptInterceptorEnabled = enabled;
-          window.__scriptInterceptorTarget = target;
-          window.__scriptInterceptorContent = content;
-          return true;
-        },
-        args: [config.enabled, config.targetUrl, config.scriptContent],
-        world: 'MAIN'
-      }).then(() => {
-        sendResponse({ success: true });
-      }).catch(error => {
-        sendResponse({ success: false, error: error.message });
-      });
-    } else {
-      sendResponse({ success: false, error: 'No configuration for this tab' });
-    }
+    const config = tabOverrideConfigs.get(tabId) || {
+      enabled: false,
+      targetUrl: '',
+      scriptContent: ''
+    };
+    
+    config.enabled = request.enabled;
+    config.targetUrl = request.targetUrl;
+    config.scriptContent = request.scriptContent;
+    
+    tabOverrideConfigs.set(tabId, config);
+    
+    // Execute script to update variables in page context
+    chrome.scripting.executeScript({
+      target: { tabId: tabId },
+      func: (enabled, target, content) => {
+        window.__scriptInterceptorEnabled = enabled;
+        window.__scriptInterceptorTarget = target;
+        window.__scriptInterceptorContent = content;
+        return true;
+      },
+      args: [config.enabled, config.targetUrl, config.scriptContent],
+      world: 'MAIN'
+    }).then(() => {
+      console.log('[Shopify Script Debugger] Updated interception config for tab', tabId);
+      sendResponse({ success: true });
+    }).catch(error => {
+      console.error('[Shopify Script Debugger] Error updating interception config:', error);
+      sendResponse({ success: false, error: error.message });
+    });
     
     return true;  // Keep message channel open
   }
   
+  console.log('[Shopify Script Debugger] Unhandled message action:', request.action);
   return false;
 });
 
@@ -280,14 +314,50 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   // Only run on complete load
   if (changeInfo.status === 'complete') {
+    console.log('[Shopify Script Debugger] Tab updated:', tabId);
+    
     // Check if we have a configuration for this tab
     if (tabOverrideConfigs.has(tabId)) {
       const config = tabOverrideConfigs.get(tabId);
       
       // Only inject if enabled
       if (config.enabled) {
+        console.log('[Shopify Script Debugger] Reinjecting interception for tab', tabId);
         injectInterceptionCode(tabId, config);
       }
     }
   }
 });
+
+// Log final initialization
+console.log('[Shopify Script Debugger] Background script initialization complete');
+
+// Function to test content script connection
+function testContentScriptConnection(tabId) {
+  console.log('[Shopify Script Debugger] Testing connection to content script in tab', tabId);
+  
+  chrome.tabs.sendMessage(tabId, {
+    action: 'testConnection',
+    message: 'Hello from background script'
+  }, response => {
+    if (chrome.runtime.lastError) {
+      console.error('[Shopify Script Debugger] Connection test failed:', chrome.runtime.lastError.message, " tabID ", tabId);
+    } else if (response) {
+      console.log('[Shopify Script Debugger] Connection test successful:', response);
+    } else {
+      console.warn('[Shopify Script Debugger] Connection test received no response');
+    }
+  });
+}
+
+// // Test connection to content script when extension is clicked
+// chrome.action.onClicked.addListener(tab => {
+//   testContentScriptConnection(tab.id);
+// });
+
+// // Also test connection to the current active tab on startup
+// chrome.tabs.query({ active: true, currentWindow: true }, tabs => {
+//   if (tabs.length > 0) {
+//     testContentScriptConnection(tabs[0].id);
+//   }
+// });
