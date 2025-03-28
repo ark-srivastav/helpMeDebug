@@ -5,7 +5,7 @@ let scriptOverrideContent = '';
 
 // Use multiple logging methods to ensure visibility
 console.log('[Shopify Script Debugger] Content script initialized');
-console.warn('[Shopify Script Debugger] Content script initialized (WARN)');
+// console.warn('[Shopify Script Debugger] Content script initialized (WARN)');
 // console.error('[Shopify Script Debugger] Content script initialized (ERROR)');
 
 // Add a visible element to the page to confirm content script injection
@@ -21,7 +21,7 @@ debugIndicator.style.borderRadius = '4px';
 debugIndicator.style.fontSize = '12px';
 debugIndicator.style.fontFamily = 'monospace';
 debugIndicator.style.zIndex = '9999';
-debugIndicator.style.display = 'none'; // Hidden by default
+// debugIndicator.style.display = 'none'; // Hidden by default
 debugIndicator.textContent = 'Script Debugger Active';
 
 // Add the indicator to the page (will be hidden initially)
