@@ -41,8 +41,9 @@ const useStorageHook = ({
   };
   // In useStorageHook.js, modify the saveScript function to accept a script name
   const saveScript = (customName) => {
+    console.log("🌅🌅🌅", scriptsListHook)
     // Create a unique key if creating a new script
-    const scriptKey = scriptsListHook.selected === 'new'
+    const scriptKey = scriptsListHook.selected === 'new' || !scriptsListHook.selected
       ? `script_${Date.now()}`
       : scriptsListHook.selected;
 
@@ -54,12 +55,16 @@ const useStorageHook = ({
     chrome.storage.local.get([SCRIPT_STORAGE_KEY], (result) => {
       const savedScripts = result[SCRIPT_STORAGE_KEY] || {};
 
+      console.log("🥎🥎🥎🥎",{result})
       const scriptData = {
         content: scriptInput,
         lastModified: Date.now(),
         label: scriptName,
+        value: scriptKey,
         description: "Custom debugging script",
       };
+
+      console.log("👹👹👹👹",{result})
 
       const updatedScripts = {
         ...savedScripts,
@@ -73,7 +78,7 @@ const useStorageHook = ({
         // Update the script list with the new script
         const newOption = { label: scriptName, value: scriptKey };
 
-        if (scriptsListHook.selected === 'new') {
+        if (scriptsListHook.selected === 'new' || !scriptsListHook.selected) {
           setScriptsListHook({
             options: [...scriptsListHook.options, newOption],
             selected: scriptKey
@@ -92,6 +97,7 @@ const useStorageHook = ({
     }
 
     chrome.storage.local.get([SCRIPT_STORAGE_KEY], (result) => {
+      console.log({result})
       if (result && result[SCRIPT_STORAGE_KEY] && result[SCRIPT_STORAGE_KEY][scriptKey]) {
         setScriptInput(result[SCRIPT_STORAGE_KEY][scriptKey].content);
       }

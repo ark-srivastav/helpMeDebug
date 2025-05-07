@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { DEFAULT_SCRIPT_INPUT, sampleScripts } from "./utils";
 
 const useScriptsListHook = ({
@@ -8,13 +8,15 @@ const useScriptsListHook = ({
   handleStorageDispatch
 }) => {
   // Initialize on component mount
-  React.useEffect(() => {
+  useEffect(() => {
     handleStorageDispatch('initiate');
   }, []);
 
   const handleScriptSelect = (scriptValue) => {
+    console.log("🐠🐠🐠", {scriptValue})
+    console.log("🍉🍉🍉", { ...scriptsListHook, selected: scriptValue })
     setScriptsListHook({ ...scriptsListHook, selected: scriptValue });
-    
+
     // Special case for "new script" option
     if (scriptValue === 'new') {
       setScriptInput('// Enter your new script here...');
@@ -28,7 +30,7 @@ const useScriptsListHook = ({
       <div className="mb-4">
         <div className="flex justify-between items-center mb-2">
           <label className="text-sm text-gray-400">Select Script</label>
-          <button 
+          <button
             onClick={() => handleScriptSelect('new')}
             className="text-xs bg-purple-600 hover:bg-purple-700 px-2 py-1 rounded"
           >

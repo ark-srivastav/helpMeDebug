@@ -3,10 +3,11 @@ let scriptOverrideEnabled = false;
 let scriptOverrideTarget = '';
 let scriptOverrideContent = '';
 
+import { logWithStyle } from "./utils"
+const logIt = logWithStyle("[Script Debugger | FG]")
+
 // Use multiple logging methods to ensure visibility
-console.log('[Shopify Script Debugger] Content script initialized');
-// console.warn('[Shopify Script Debugger] Content script initialized (WARN)');
-// console.error('[Shopify Script Debugger] Content script initialized (ERROR)');
+logIt('info', 'Content script initialized');
 
 // Add a visible element to the page to confirm content script injection
 const debugIndicator = document.createElement('div');
@@ -40,13 +41,13 @@ function setupScriptInterception() {
       }
     }, (response) => {
       if (chrome.runtime.lastError) {
-        console.warn('[Shopify Script Debugger] Error setting up interception:', chrome.runtime.lastError.message);
+        logIt('error','Error setting up interception:', chrome.runtime.lastError.message);
         return;
       }
-      console.log('[Shopify Script Debugger] Interception setup result:', response?.success ? 'success' : 'failed');
+      logIt('warning','Interception setup result:', response?.success ? 'success' : 'failed');
     });
   } catch (error) {
-    console.error('[Shopify Script Debugger] Error in setupScriptInterception:', error);
+    logIt('error','Error in setupScriptInterception:', error);
   }
 }
 
@@ -57,19 +58,19 @@ function getPageScripts() {
       .map(script => script.src)
       .filter(src => src && src.length > 0);
   } catch (error) {
-    console.error('[Shopify Script Debugger] Error getting page scripts:', error);
+    logIt('error','Error getting page scripts:', error);
     return [];
   }
 }
 
 // Listen for messages from the popup or background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  console.log('[Shopify Script Debugger] Received message:', request.action);
-  
+  logIt('success','Received message:', request.action);
+
   // Test connection message - respond immediately
   if (request.action === 'testConnection') {
-    console.log('[Shopify Script Debugger] Connection test received:', request.message);
-    
+    logIt('success','Connection test received:', request.message);
+
     // Show the debug indicator briefly
     const indicator = document.getElementById('shopify-script-debugger-indicator');
     if (indicator) {
@@ -78,14 +79,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         indicator.style.display = 'none';
       }, 3000); // Hide after 3 seconds
     }
-    
-    sendResponse({ 
-      success: true, 
-      message: 'Content script is alive and responding' 
+
+    sendResponse({
+      success: true,
+      message: 'Content script is alive and responding'
     });
     return true;
   }
-  
+
   try {
     // Handle one-time script injection
     if (request.action === 'injectScript') {
@@ -95,7 +96,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         code: request.scriptContent
       }, (response) => {
         if (chrome.runtime.lastError) {
-          console.warn('[Shopify Script Debugger] Error executing script:', chrome.runtime.lastError.message);
+          logIt('error','Error executing script:', chrome.runtime.lastError.message);
           sendResponse({ success: false, error: chrome.runtime.lastError.message });
           return;
         }
@@ -103,18 +104,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
       return true; // Keep the message channel open for async response
     }
-    
+
     // Handle script override toggle
     else if (request.action === 'toggleScriptOverride') {
       scriptOverrideEnabled = request.enabled;
       scriptOverrideTarget = request.targetUrl;
       scriptOverrideContent = request.scriptContent;
-      
+
       // Setup the interception if enabled
       if (scriptOverrideEnabled) {
         setupScriptInterception();
       }
-      
+
       // Notify the background script of the change
       chrome.runtime.sendMessage({
         action: 'updateInterceptionConfig',
@@ -123,13 +124,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         scriptContent: scriptOverrideContent
       }, (response) => {
         if (chrome.runtime.lastError) {
-          console.warn('[Shopify Script Debugger] Error updating config:', chrome.runtime.lastError.message);
+          logIt('warning', 'Error updating config:', chrome.runtime.lastError.message);
         }
       });
-      
+
       sendResponse({ success: true });
     }
-    
+
     // Get current override status
     else if (request.action === 'getOverrideStatus') {
       sendResponse({
@@ -137,7 +138,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         targetUrl: scriptOverrideTarget
       });
     }
-    
+
     // Get scripts on the page
     else if (request.action === 'getPageScripts') {
       sendResponse({
@@ -146,18 +147,18 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
     }
   } catch (error) {
-    console.error('[Shopify Script Debugger] Error in message handler:', error);
+    logIt('error', 'Error in message handler:', error);
     sendResponse({ success: false, error: error.message });
   }
-  
+
   // Return true to indicate we'll send a response asynchronously
   return true;
 });
 
 // Notify that content script is fully loaded
 window.addEventListener('load', () => {
-  console.log('[Shopify Script Debugger] Page fully loaded');
+  logIt('info', 'Page fully loaded');
 });
 
 // Final initialization log
-console.log('[Shopify Script Debugger] Content script setup complete');
+logIt('info', 'Content script setup complete');
