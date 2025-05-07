@@ -6,7 +6,12 @@
   "permissions": ["storage", "scripting", "activeTab", "tabs"],
   "host_permissions": ["*://*/*"],
   "action": {
-    "default_popup": "popup/popup.html"
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/spiderman.webp",
+      "48": "icons/spiderman.webp",
+      "128": "icons/spiderman.webp"
+    }
   },
   "content_scripts": [
     {

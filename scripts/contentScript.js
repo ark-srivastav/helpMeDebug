@@ -3,11 +3,34 @@ let scriptOverrideEnabled = false;
 let scriptOverrideTarget = '';
 let scriptOverrideContent = '';
 
-import { logWithStyle } from "./utils"
-const logIt = logWithStyle("[Script Debugger | FG]")
+// Utility function for styled logging
+function logWithStyle(type = "info", prefix = "[Script Debugger | FG]", message, ...args) {
+  let styles;
+
+  switch (type) {
+    case 'info':
+      styles = 'background: #5046e5; color: white; padding: 3px 6px; border-radius: 3px; font-weight: bold;';
+      console.log(`%c${prefix}`, styles, message, ...args);
+      break;
+    case 'success':
+      styles = 'background: #10b981; color: white; padding: 3px 6px; border-radius: 3px; font-weight: bold;';
+      console.log(`%c${prefix}`, styles, message, ...args);
+      break;
+    case 'warning':
+      styles = 'background: #f59e0b; color: white; padding: 3px 6px; border-radius: 3px; font-weight: bold;';
+      console.warn(`%c${prefix}`, styles, message, ...args);
+      break;
+    case 'error':
+      styles = 'background: #ef4444; color: white; padding: 3px 6px; border-radius: 3px; font-weight: bold;';
+      console.error(`%c${prefix}`, styles, message, ...args);
+      break;
+  }
+}
+
+const log = (type, message, ...args) => logWithStyle(type, "[Script Debugger | FG]", message, ...args);
 
 // Use multiple logging methods to ensure visibility
-logIt('info', 'Content script initialized');
+log('info', 'Content script initialized');
 
 // Add a visible element to the page to confirm content script injection
 const debugIndicator = document.createElement('div');
@@ -22,7 +45,7 @@ debugIndicator.style.borderRadius = '4px';
 debugIndicator.style.fontSize = '12px';
 debugIndicator.style.fontFamily = 'monospace';
 debugIndicator.style.zIndex = '9999';
-// debugIndicator.style.display = 'none'; // Hidden by default
+debugIndicator.style.display = 'none'; // Hidden by default
 debugIndicator.textContent = 'Script Debugger Active';
 
 // Add the indicator to the page (will be hidden initially)
@@ -41,13 +64,13 @@ function setupScriptInterception() {
       }
     }, (response) => {
       if (chrome.runtime.lastError) {
-        logIt('error','Error setting up interception:', chrome.runtime.lastError.message);
+        log('error','Error setting up interception:', chrome.runtime.lastError.message);
         return;
       }
-      logIt('warning','Interception setup result:', response?.success ? 'success' : 'failed');
+      log('warning','Interception setup result:', response?.success ? 'success' : 'failed');
     });
   } catch (error) {
-    logIt('error','Error in setupScriptInterception:', error);
+    log('error','Error in setupScriptInterception:', error);
   }
 }
 
@@ -58,18 +81,96 @@ function getPageScripts() {
       .map(script => script.src)
       .filter(src => src && src.length > 0);
   } catch (error) {
-    logIt('error','Error getting page scripts:', error);
+    log('error','Error getting page scripts:', error);
     return [];
+  }
+}
+
+// Enhanced content script execution handler for script injection
+
+// Track previously injected scripts for cleanup
+let injectedScripts = [];
+
+// Handler for script injection
+function handleScriptInjection(request, sender, sendResponse) {
+  log('info', 'Handling script injection request');
+  
+  // Clean up previously injected scripts to prevent conflicts
+  cleanupPreviousScripts();
+  
+  // Ask the background script to inject the code
+  chrome.runtime.sendMessage({
+    action: 'executeScript',
+    code: request.scriptContent
+  }, (response) => {
+    if (chrome.runtime.lastError) {
+      log('error', 'Error executing script:', chrome.runtime.lastError.message);
+      sendResponse({ 
+        success: false, 
+        error: chrome.runtime.lastError.message 
+      });
+      return;
+    }
+    
+    // If the script was successfully injected, track its ID
+    if (response && response.success && 
+        response.results && response.results.length > 0 && 
+        response.results[0].result && response.results[0].result.scriptId) {
+      injectedScripts.push(response.results[0].result.scriptId);
+    }
+    
+    sendResponse(response);
+  });
+  
+  // Return true to indicate we'll send a response asynchronously
+  return true;
+}
+
+// Clean up previously injected scripts to prevent duplicate declarations
+function cleanupPreviousScripts() {
+  try {
+    // Execute a script to remove previously injected scripts
+    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+      if (!tabs || tabs.length === 0) return;
+      
+      chrome.scripting.executeScript({
+        target: { tabId: tabs[0].id },
+        func: (scriptIds) => {
+          // Remove each script with the tracked IDs
+          scriptIds.forEach(id => {
+            const scriptElement = document.getElementById(id);
+            if (scriptElement && scriptElement.parentNode) {
+              scriptElement.parentNode.removeChild(scriptElement);
+            }
+          });
+          return true;
+        },
+        args: [injectedScripts],
+        world: 'MAIN'
+      }).then(() => {
+        // Clear the tracked scripts after cleanup
+        injectedScripts = [];
+        log('info', 'Previous scripts cleaned up successfully');
+      }).catch(error => {
+        log('error', 'Error cleaning up scripts:', error);
+      });
+    });
+  } catch (error) {
+    log('error', 'Error in cleanupPreviousScripts:', error);
   }
 }
 
 // Listen for messages from the popup or background script
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  logIt('success','Received message:', request.action);
+  log('success','Received message:', request.action);
+
+  if (request.action === 'injectScript') {
+    return handleScriptInjection(request, sender, sendResponse);
+  }
 
   // Test connection message - respond immediately
   if (request.action === 'testConnection') {
-    logIt('success','Connection test received:', request.message);
+    log('success','Connection test received:', request.message);
 
     // Show the debug indicator briefly
     const indicator = document.getElementById('shopify-script-debugger-indicator');
@@ -96,7 +197,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         code: request.scriptContent
       }, (response) => {
         if (chrome.runtime.lastError) {
-          logIt('error','Error executing script:', chrome.runtime.lastError.message);
+          log('error','Error executing script:', chrome.runtime.lastError.message);
           sendResponse({ success: false, error: chrome.runtime.lastError.message });
           return;
         }
@@ -124,7 +225,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         scriptContent: scriptOverrideContent
       }, (response) => {
         if (chrome.runtime.lastError) {
-          logIt('warning', 'Error updating config:', chrome.runtime.lastError.message);
+          log('warning', 'Error updating config:', chrome.runtime.lastError.message);
         }
       });
 
@@ -147,7 +248,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       });
     }
   } catch (error) {
-    logIt('error', 'Error in message handler:', error);
+    log('error', 'Error in message handler:', error);
     sendResponse({ success: false, error: error.message });
   }
 
@@ -157,8 +258,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
 // Notify that content script is fully loaded
 window.addEventListener('load', () => {
-  logIt('info', 'Page fully loaded');
+  log('info', 'Page fully loaded');
 });
 
 // Final initialization log
-logIt('info', 'Content script setup complete');
+log('info', 'Content script setup complete');
