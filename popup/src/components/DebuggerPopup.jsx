@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import ScriptNameModal from "./ScriptNameModal";
 import { Code, Play, Save, Trash2, RefreshCw } from "lucide-react";
 import CodeMirror from "@uiw/react-codemirror";
 import { javascript } from "@codemirror/lang-javascript";
@@ -14,8 +15,6 @@ export default function DebuggerPopup() {
   const [scriptsListHook, setScriptsListHook] = useState(defaultScriptsListHook);
   const [isMaximized, setIsMaximized] = useState(false);
   const [statusMessage, setStatusMessage] = useState("Ready to inject");
-  const [targetUrl, setTargetUrl] = useState("");
-  const [overrideEnabled, setOverrideEnabled] = useState(true);
   const [currentTab, setCurrentTab] = useState(null);
 
   // In DebuggerPopup.jsx, add a new state for script name
@@ -24,34 +23,22 @@ export default function DebuggerPopup() {
   const [executionLogs, setExecutionLogs] = useState([]);
 
   const [copyStatus, setCopyStatus] = useState("");
-
-  // Get current tab info when popup opens
-  useEffect(() => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      if (tabs && tabs[0]) {
-        setCurrentTab(tabs[0]);
-
-        // Check if override is enabled for this tab
-        chrome.tabs.sendMessage(tabs[0].id, { action: "getOverrideStatus" }, (response) => {
-          if (response && response.enabled) {
-            setOverrideEnabled(response.enabled);
-            setTargetUrl(response.targetUrl || "");
-          }
-        });
-      }
-    });
-  }, []);
+  const [isModalOpen, setIsModalOpen] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e) => {
       // Ctrl+S to save
-      if (e.ctrlKey && e.key === "s") {
+      if ((e.ctrlKey || e.metaKey) && e.key === "s") {
         e.preventDefault();
-        handleSaveScript();
+        if (scriptsListHook.selected === "new" && !scriptName) {
+          setIsModalOpen(true);
+        } else {
+          handleSaveScript();
+        }
       }
 
       // Ctrl+Enter to run
-      if (e.ctrlKey && e.key === "Enter") {
+      if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
         e.preventDefault();
         injectScript();
       }
@@ -147,65 +134,7 @@ export default function DebuggerPopup() {
       }
     );
   };
-  const toggleScriptOverride = () => {
-    if (!currentTab) {
-      setStatusMessage("No active tab");
-      return;
-    }
 
-    const newOverrideState = !overrideEnabled;
-    setOverrideEnabled(newOverrideState);
-
-    chrome.tabs.sendMessage(
-      currentTab.id,
-      {
-        action: "toggleScriptOverride",
-        enabled: newOverrideState,
-        targetUrl: targetUrl,
-        scriptContent: scriptInput,
-      },
-      function (response) {
-        if (chrome.runtime.lastError) {
-          setStatusMessage(`Error: ${chrome.runtime.lastError.message}`);
-        } else if (response && response.success) {
-          setStatusMessage(newOverrideState ? `Override enabled for: ${targetUrl}` : "Override disabled");
-        } else {
-          setStatusMessage("Failed to toggle override");
-        }
-      }
-    );
-  };
-
-  const extractScriptUrlFromPage = () => {
-    if (!currentTab) {
-      setStatusMessage("No active tab");
-      return;
-    }
-
-    chrome.tabs.sendMessage(
-      currentTab.id,
-      {
-        action: "getPageScripts",
-      },
-      function (response) {
-        if (chrome.runtime.lastError) {
-          setStatusMessage(`Error: ${chrome.runtime.lastError.message}`);
-        } else if (response && response.scripts && response.scripts.length > 0) {
-          // Show a simple dropdown for script selection
-          const scriptUrl = prompt("Select a script URL to override (or enter a pattern):", response.scripts.join("\n"));
-
-          if (scriptUrl) {
-            setTargetUrl(scriptUrl.trim());
-            setStatusMessage(`Target set to: ${scriptUrl.trim()}`);
-          }
-        } else {
-          setStatusMessage("No scripts found on page");
-        }
-      }
-    );
-  };
-
-  // Add this function in DebuggerPopup.jsx
   const copyToClipboard = () => {
     navigator.clipboard
       .writeText(scriptInput)
@@ -239,6 +168,13 @@ export default function DebuggerPopup() {
     );
   };
 
+  const saveWithName = (name) => {
+    setScriptName(name);
+    handleStorageDispatch("save", null, name);
+    setStatusMessage("Script saved successfully");
+    setIsModalOpen(false);
+  };
+
   return (
     <div className="w-[600px] min-h-[500px] bg-gray-900 text-gray-100 p-4 font-mono">
       {/* Header */}
@@ -247,32 +183,16 @@ export default function DebuggerPopup() {
           <Code className="h-5 w-5 text-purple-400" />
           <h1 className="text-lg font-bold text-purple-400">Script Debug</h1>
         </div>
-        <button onClick={toggleScriptOverride} className={`px-3 py-1 rounded ${overrideEnabled ? "bg-purple-600" : "bg-gray-700"} hover:bg-purple-500`}>
-          {overrideEnabled ? "Override Active" : "Override Inactive"}
+        <button onClick={() => {}} className={`px-3 py-1 rounded  "bg-purple-600" hover:bg-purple-500`}>
+          Format
         </button>
       </div>
       {renderScriptsOptionsList()}
-      {/* Script URL Target Field */}
-      <div className="mb-4">
-        <div className="flex space-x-2">
-          <input
-            type="text"
-            placeholder="Script URL to override (e.g., example.com/script.js)"
-            value={targetUrl}
-            onChange={(e) => setTargetUrl(e.target.value)}
-            className="flex-1 bg-gray-800 border border-gray-700 rounded px-3 py-2 text-sm focus:border-purple-500 focus:ring-1 focus:ring-purple-500"
-          />
-          <button onClick={extractScriptUrlFromPage} className="bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded" title="Find scripts on this page">
-            <RefreshCw className="h-4 w-4" />
-          </button>
-        </div>
-        <div className="text-xs text-gray-500 mt-1">Enter the URL or domain of the script you want to override</div>
-      </div>
       {/* Quick Actions */}
       <div className="flex space-x-2 mb-4">
         <button className="flex-1 flex items-center justify-center space-x-1 bg-purple-600 hover:bg-purple-700 px-3 py-2 rounded" onClick={injectScript}>
           <Play className="h-4 w-4" />
-          <span>Inject Once</span>
+          <span>Run Script</span>
         </button>
         <button className="flex-1 flex items-center justify-center space-x-1 bg-gray-700 hover:bg-gray-600 px-3 py-2 rounded" onClick={handleSaveScript}>
           <Save className="h-4 w-4" />
@@ -357,6 +277,7 @@ export default function DebuggerPopup() {
       {/* Status */}
       <StatusIndicator status={statusMessage} />
       <div className="text-xs text-gray-500 mt-2">Tip: Use Ctrl+S to save and Ctrl+Enter to run</div>
+      <ScriptNameModal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} onSave={saveWithName} initialValue={scriptName} />
     </div>
   );
 }

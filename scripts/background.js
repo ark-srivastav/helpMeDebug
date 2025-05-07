@@ -5,55 +5,56 @@
  * @param {*} message 
  * @param  {...any} args 
  */
-const logWithStyle = (type = "info", message, ...args) => {
-  let styles;
-  let prefix;
+// const logWithStyle = (type = "info", message, ...args) => {
+//   let styles;
+//   let prefix;
 
-  switch (type) {
-    case 'info':
-      styles = 'background: #5046e5; color: white; padding: 3px 6px; border-radius: 3px; font-weight: bold;';
-      prefix = '[Script Debugger | BG]';
-      console.log(`%c${prefix}`, styles, message, ...args);
-      break;
-    case 'success':
-      styles = 'background: #10b981; color: white; padding: 3px 6px; border-radius: 3px; font-weight: bold;';
-      prefix = '[Script Debugger | BG]';
-      console.log(`%c${prefix}`, styles, message, ...args);
-      break;
-    case 'warning':
-      styles = 'background: #f59e0b; color: white; padding: 3px 6px; border-radius: 3px; font-weight: bold;';
-      prefix = '[Script Debugger | BG]';
-      console.warn(`%c${prefix}`, styles, message, ...args);
-      break;
-    case 'error':
-      styles = 'background: #ef4444; color: white; padding: 3px 6px; border-radius: 3px; font-weight: bold;';
-      prefix = '[Script Debugger | BG]';
-      console.error(`%c${prefix}`, styles, message, ...args);
-      break;
-  }
-};
+//   switch (type) {
+//     case 'info':
+//       styles = 'background: #5046e5; color: white; padding: 3px 6px; border-radius: 3px; font-weight: bold;';
+//       prefix = '[Script Debugger | BG]';
+//       console.log(`%c${prefix}`, styles, message, ...args);
+//       break;
+//     case 'success':
+//       styles = 'background: #10b981; color: white; padding: 3px 6px; border-radius: 3px; font-weight: bold;';
+//       prefix = '[Script Debugger | BG]';
+//       console.log(`%c${prefix}`, styles, message, ...args);
+//       break;
+//     case 'warning':
+//       styles = 'background: #f59e0b; color: white; padding: 3px 6px; border-radius: 3px; font-weight: bold;';
+//       prefix = '[Script Debugger | BG]';
+//       console.warn(`%c${prefix}`, styles, message, ...args);
+//       break;
+//     case 'error':
+//       styles = 'background: #ef4444; color: white; padding: 3px 6px; border-radius: 3px; font-weight: bold;';
+//       prefix = '[Script Debugger | BG]';
+//       console.error(`%c${prefix}`, styles, message, ...args);
+//       break;
+//   }
+// };
 
 // Store override configurations per tab
+import { logWithStyle } from "./utils"
 const tabOverrideConfigs = new Map();
 
 // Log initialization immediately to verify script loading
-logWithStyle("info", 'initializing');
+const logIt = logWithStyle("[Script Debugger | BG]")
 
 // Register the service worker
 self.addEventListener('install', (event) => {
-  logWithStyle("info", 'Service worker installed');
+  logIt("info", 'Service worker installed');
   self.skipWaiting(); // Ensure the service worker activates immediately
 });
 
 self.addEventListener('activate', (event) => {
-  logWithStyle("info", 'Service worker activated');
+  logIt("info", 'Service worker activated');
   // Claim any existing clients
   event.waitUntil(clients.claim());
 });
 
 // Function to inject the interception code
 function injectInterceptionCode(tabId, config) {
-  logWithStyle("info", 'Injecting interception code for tab', tabId);
+  logIt("info", 'Injecting interception code for tab', tabId);
 
   // First, we'll inject a function to handle the interception
   chrome.scripting.executeScript({
@@ -62,9 +63,9 @@ function injectInterceptionCode(tabId, config) {
     args: [config.targetUrl, config.scriptContent, config.enabled],
     world: 'MAIN'  // This is important - it executes in the page's context
   }).then(() => {
-    logWithStyle("info", 'Interception code injected successfully for tab', tabId);
+    logIt("info", 'Interception code injected successfully for tab', tabId);
   }).catch(error => {
-    logWithStyle("error", 'Failed to inject interception code:', error);
+    logIt("error", 'Failed to inject interception code:', error);
   });
 
   // This function will be serialized and injected into the page
@@ -74,7 +75,7 @@ function injectInterceptionCode(tabId, config) {
       window.__scriptInterceptorEnabled = enabled;
       window.__scriptInterceptorTarget = targetUrl;
       window.__scriptInterceptorContent = scriptContent;
-      logWithStyle("info",
+      logIt("info",
         'Updated interception config:',
         { enabled, target: targetUrl }
       );
@@ -101,7 +102,7 @@ function injectInterceptionCode(tabId, config) {
         typeof resource === 'string' &&
         resource.includes(window.__scriptInterceptorTarget)
       ) {
-        logWithStyle("info",
+        logIt("info",
           'Intercepted fetch request for:',
           resource
         );
@@ -134,7 +135,7 @@ function injectInterceptionCode(tabId, config) {
         typeof this._interceptedUrl === 'string' &&
         this._interceptedUrl.includes(window.__scriptInterceptorTarget)
       ) {
-        logWithStyle("info",
+        logIt("info",
           'Intercepted XHR request for:',
           this._interceptedUrl
         );
@@ -177,7 +178,7 @@ function injectInterceptionCode(tabId, config) {
             typeof value === 'string' &&
             value.includes(window.__scriptInterceptorTarget)
           ) {
-            logWithStyle("info",
+            logIt("info",
               'Intercepted script src attribute:',
               value
             );
@@ -208,7 +209,7 @@ function injectInterceptionCode(tabId, config) {
       return element;
     };
 
-    logWithStyle("info",
+    logIt("info",
       'Script interception initialized:',
       { enabled, target: targetUrl }
     );
@@ -219,7 +220,7 @@ function injectInterceptionCode(tabId, config) {
 
 // In background.js, improve the executeScript function
 function executeScript(tabId, code) {
-  logWithStyle('info', 'Executing script in tab', tabId);
+  logIt('info', 'Executing script in tab', tabId);
 
   return chrome.scripting.executeScript({
     target: { tabId: tabId },
@@ -288,24 +289,24 @@ function executeScript(tabId, code) {
 }
 // Listen for messages
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
-  logWithStyle('info', 'Background received message:', request.action);
+  logIt('info', 'Background received message:', request.action);
 
   // Handle script execution
   if (request.action === 'executeScript') {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || tabs.length === 0) {
-        logWithStyle('error', 'No active tab found');
+        logIt('error', 'No active tab found');
         sendResponse({ success: false, error: 'No active tab found' });
         return;
       }
 
       executeScript(tabs[0].id, request.code)
         .then(results => {
-          logWithStyle('info', 'Script execution results:', results);
+          logIt('info', 'Script execution results:', results);
           sendResponse({ success: true, results });
         })
         .catch(error => {
-          logWithStyle('error', 'Script execution error:', error);
+          logIt('error', 'Script execution error:', error);
           sendResponse({ success: false, error: error.message });
         });
     });
@@ -317,7 +318,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   else if (request.action === 'setupInterception') {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
       if (!tabs || tabs.length === 0) {
-        logWithStyle('error', 'No active tab found');
+        logIt('error', 'No active tab found');
         sendResponse({ success: false, error: 'No active tab found' });
         return;
       }
@@ -341,7 +342,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     const tabId = sender?.tab?.id;
 
     if (!tabId) {
-      logWithStyle('error', 'No tab ID provided in updateInterceptionConfig');
+      logIt('error', 'No tab ID provided in updateInterceptionConfig');
       sendResponse({ success: false, error: 'No tab ID provided' });
       return true;
     }
@@ -371,17 +372,17 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       args: [config.enabled, config.targetUrl, config.scriptContent],
       world: 'MAIN'
     }).then(() => {
-      logWithStyle('info', 'Updated interception config for tab', tabId);
+      logIt('info', 'Updated interception config for tab', tabId);
       sendResponse({ success: true });
     }).catch(error => {
-      logWithStyle('error', 'Error updating interception config:', error);
+      logIt('error', 'Error updating interception config:', error);
       sendResponse({ success: false, error: error.message });
     });
 
     return true;  // Keep message channel open
   }
 
-  logWithStyle('info', 'Unhandled message action:', request.action);
+  logIt('info', 'Unhandled message action:', request.action);
   return false;
 });
 
@@ -389,7 +390,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
   // Only run on complete load
   if (changeInfo.status === 'complete') {
-    logWithStyle('info','Tab updated:', tabId);
+    logIt('info','Tab updated:', tabId);
 
     // Check if we have a configuration for this tab
     if (tabOverrideConfigs.has(tabId)) {
@@ -397,7 +398,7 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 
       // Only inject if enabled
       if (config.enabled) {
-        logWithStyle('error', 'Reinjecting interception for tab', tabId);
+        logIt('error', 'Reinjecting interception for tab', tabId);
         injectInterceptionCode(tabId, config);
       }
     }
@@ -405,22 +406,22 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
 });
 
 // Log final initialization
-logWithStyle('info', 'Background script initialization complete');
+logIt('info', 'Background script initialization complete');
 
 // Function to test content script connection
 function testContentScriptConnection(tabId) {
-  logWithStyle('info', 'Testing connection to content script in tab', tabId);
+  logIt('info', 'Testing connection to content script in tab', tabId);
 
   chrome.tabs.sendMessage(tabId, {
     action: 'testConnection',
     message: 'Hello from background script'
   }, response => {
     if (chrome.runtime.lastError) {
-      logWithStyle('info', 'Connection test failed:', chrome.runtime.lastError.message, " tabID ", tabId);
+      logIt('info', 'Connection test failed:', chrome.runtime.lastError.message, " tabID ", tabId);
     } else if (response) {
-      logWithStyle('info', 'Connection test successful:', response);
+      logIt('info', 'Connection test successful:', response);
     } else {
-      logWithStyle('warning', 'Connection test received no response');
+      logIt('warning', 'Connection test received no response');
     }
   });
 }
